@@ -1,0 +1,4 @@
+StopTime 1.0.0
+Build type: Android WebView + Java Bluetooth RFCOMM bridge
+Roles: Controller / Display
+Transport: Bluetooth Classic RFCOMM

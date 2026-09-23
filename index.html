@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>StopTime</title>
+<style>
+  :root{--bg:#000;--fg:#f5f5f5;--muted:#777;--line:#232323;--accent:#fff;--glass:rgba(255,255,255,.06)}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;width:100%;height:100%;background:#000;color:var(--fg);font-family:Inter,Roboto,Arial,sans-serif;overflow:hidden}
+  body{display:flex;justify-content:center}
+  #app{width:100%;max-width:520px;height:100%;min-height:100%;padding:env(safe-area-inset-top) 18px env(safe-area-inset-bottom);display:flex;flex-direction:column}
+  .top{height:62px;display:flex;align-items:center;justify-content:space-between;flex:0 0 62px}
+  .brand{font-size:20px;font-weight:800;letter-spacing:.18em;text-transform:uppercase}
+  .led{width:9px;height:9px;border-radius:50%;background:#444;box-shadow:none;transition:.2s}
+  .led.on{background:#fff;box-shadow:0 0 12px rgba(255,255,255,.85)}
+  .screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:0}
+  .mode{color:var(--muted);font-size:12px;letter-spacing:.22em;text-transform:uppercase;margin-bottom:14px;text-align:center}
+  .time{font-variant-numeric:tabular-nums;letter-spacing:.045em;font-size:clamp(52px,15vw,94px);font-weight:900;line-height:1;margin-bottom:28px;text-shadow:0 0 8px rgba(255,255,255,.12)}
+  .sub{height:20px;color:var(--muted);font-size:12px;text-align:center;margin-top:-12px;margin-bottom:20px}
+  .main-btn{width:min(72vw,280px);aspect-ratio:1;border-radius:50%;border:1px solid #3a3a3a;background:radial-gradient(circle at 50% 40%,#171717 0,#090909 52%,#020202 100%);color:#fff;font-size:20px;font-weight:900;letter-spacing:.18em;box-shadow:0 0 0 1px rgba(255,255,255,.04),inset 0 0 40px rgba(255,255,255,.03),0 15px 55px rgba(0,0,0,.9);transition:transform .08s,border-color .2s,box-shadow .2s}
+  .main-btn:active{transform:scale(.982)}
+  .main-btn.running{border-color:#777;box-shadow:0 0 0 1px rgba(255,255,255,.05),inset 0 0 55px rgba(255,255,255,.05),0 0 36px rgba(255,255,255,.08)}
+  .controls{display:flex;gap:10px;margin-top:18px;justify-content:center;flex-wrap:wrap}
+  button,.select{appearance:none;border:1px solid #2d2d2d;background:#0a0a0a;color:#fff;border-radius:16px;padding:13px 16px;font-size:13px;font-weight:700}
+  button:active{transform:translateY(1px)}
+  .ghost{color:#ccc;background:#050505}
+  .panel{width:100%;border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.015));border-radius:22px;padding:16px;margin-top:12px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 0}
+  .label{font-size:12px;color:#aaa;letter-spacing:.05em}
+  .value{font-size:13px;color:#fff}
+  .device-list{max-height:220px;overflow:auto;margin-top:8px}
+  .device{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid #181818;gap:10px}
+  .device-name{font-size:14px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .device-address{font-size:10px;color:#666;margin-top:3px;font-family:monospace}
+  .small{padding:9px 12px;border-radius:12px;font-size:11px}
+  .footer{height:54px;flex:0 0 54px;display:flex;align-items:center;justify-content:center;color:#555;font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+  .hidden{display:none!important}
+  .status{font-size:12px;color:#aaa;margin-top:4px;text-align:center;min-height:17px}
+  .title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .panel-title{font-size:12px;letter-spacing:.16em;color:#ddd;text-transform:uppercase}
+  .lang{font-size:10px;padding:7px 10px;border-radius:10px}
+  .displayHint{font-size:11px;color:#6e6e6e;text-align:center;margin-top:10px;line-height:1.5;max-width:280px}
+  @media (max-height:650px){.time{font-size:clamp(46px,13vw,72px);margin-bottom:18px}.main-btn{width:min(58vw,225px)}.footer{height:42px;flex-basis:42px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top">
+    <div class="brand">StopTime</div>
+    <div id="led" class="led"></div>
+  </div>
+
+  <div class="screen">
+    <div id="modeText" class="mode">Choose a role</div>
+    <div id="timer" class="time">00:00.000</div>
+    <div id="status" class="status">Bluetooth not connected</div>
+    <div id="buttonWrap" class="controls">
+      <button id="controllerBtn" class="ghost" onclick="selectRole('controller')">CONTROLLER</button>
+      <button id="displayBtn" class="ghost" onclick="selectRole('display')">DISPLAY</button>
+    </div>
+
+    <div id="controllerPanel" class="panel hidden">
+      <div class="title-row"><div class="panel-title">Controller</div><button class="small lang" onclick="toggleLanguage()">AR</button></div>
+      <div class="row"><div class="label" id="hostLabel">Bluetooth host</div><button class="small" onclick="host()" id="hostBtn">START HOST</button></div>
+      <div class="row"><div class="label" id="discoverLabel">Pairing</div><button class="small" onclick="discoverable()">MAKE VISIBLE</button></div>
+      <div class="row"><div class="label">Connection</div><div class="value" id="controllerConn">Waiting</div></div>
+    </div>
+
+    <div id="displayPanel" class="panel hidden">
+      <div class="title-row"><div class="panel-title">Display</div><button class="small lang" onclick="toggleLanguage()">AR</button></div>
+      <div class="row"><div class="label">Paired devices</div><button class="small" onclick="refreshDevices()">REFRESH</button></div>
+      <div id="deviceList" class="device-list"></div>
+      <div class="row"><button class="small" onclick="openBluetoothSettings()">BLUETOOTH SETTINGS</button><button class="small" onclick="disconnectBT()">DISCONNECT</button></div>
+      <div class="displayHint">Pair both Android phones first, then connect the Display to the Controller from this list.</div>
+    </div>
+
+    <div id="gameControls" class="hidden">
+      <button id="mainBtn" class="main-btn" onclick="toggleRun()">START</button>
+      <div class="controls"><button class="ghost" onclick="resetTimer()">RESET</button><button class="ghost" onclick="disconnectBT()">DISCONNECT</button></div>
+    </div>
+  </div>
+  <div class="footer">Bluetooth Classic • precision sync</div>
+</div>
+
+<script>
+const state={
+  role:'', connected:false, running:false, startMono:0, accumulated:0, displayStartWall:0, displayAccumulated:0,
+  clockOffset:0, syncSamples:[], lang:'en', hostStarted:false
+};
+
+const $=id=>document.getElementById(id);
+function native(){return window.AndroidBridge||null}
+function fmt(ms){ms=Math.max(0,Math.floor(ms));const m=Math.floor(ms/60000),s=Math.floor(ms%60000/1000),x=ms%1000;return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+String(x).padStart(3,'0')}
+function nowMono(){return performance.now()}
+function nowWall(){return Date.now()}
+function currentElapsed(){if(!state.running)return state.accumulated;return state.accumulated+Math.max(0,nowMono()-state.startMono)}
+function displayElapsed(){if(!state.running)return state.displayAccumulated;return state.displayAccumulated+Math.max(0, nowWall()+state.clockOffset-state.displayStartWall)}
+function render(){
+  $('timer').textContent=fmt(state.role==='display'?displayElapsed():currentElapsed());
+  requestAnimationFrame(render)
+}
+render();
+
+function post(type,payload={}){if(!native()||!state.connected)return;native().send(JSON.stringify({type,...payload}))}
+function selectRole(role){
+  state.role=role;native()?.setRole(role);
+  $('modeText').textContent=role==='controller'?'Controller':'Display';
+  $('buttonWrap').classList.add('hidden');
+  $('controllerPanel').classList.toggle('hidden',role!=='controller');
+  $('displayPanel').classList.toggle('hidden',role!=='display');
+  $('gameControls').classList.toggle('hidden',role!=='controller');
+  $('timer').textContent='00:00.000';
+  setStatus(role==='controller'?'Start the Bluetooth host, then pair/connect the other phone.':'Choose the paired Controller phone to connect.');
+  if(role==='display') refreshDevices();
+}
+function setStatus(t){$('status').textContent=t}
+function host(){native()?.host();setStatus('Opening Bluetooth host…')}
+function discoverable(){native()?.makeDiscoverable();setStatus('Bluetooth visibility request opened.')}
+function refreshDevices(){
+  if(!native()){setStatus('Native Bluetooth bridge unavailable.');return}
+  try{
+    const raw=native().getPairedDevices();const arr=JSON.parse(raw||'[]');const list=$('deviceList');list.innerHTML='';
+    if(!arr.length){list.innerHTML='<div class="device"><div><div class="device-name">No paired devices</div><div class="device-address">Pair in Bluetooth settings first.</div></div></div>';return}
+    arr.forEach(d=>{const el=document.createElement('div');el.className='device';el.innerHTML='<div><div class="device-name"></div><div class="device-address"></div></div><button class="small">CONNECT</button>';el.querySelector('.device-name').textContent=d.name||'Unnamed device';el.querySelector('.device-address').textContent=d.address;el.querySelector('button').onclick=()=>connect(d.address);list.appendChild(el)});
+  }catch(e){setStatus('Could not read paired devices.')}
+}
+function connect(address){setStatus('Connecting…');native()?.connect(address)}
+function openBluetoothSettings(){native()?.openBluetoothSettings()}
+function disconnectBT(){native()?.disconnect();state.connected=false;state.running=false;state.accumulated=currentElapsed();updateConnection(false);setStatus('Disconnected')}
+
+function toggleRun(){
+  if(!state.connected){setStatus('Connect Bluetooth first.');return}
+  const e=currentElapsed();
+  if(state.running){
+    state.accumulated=e;state.running=false;$('mainBtn').textContent='START';$('mainBtn').classList.remove('running');post('STOP',{elapsedMs:Math.round(state.accumulated),serverNow:nowWall()});
+  }else{
+    const startAt=nowWall()+900;state.accumulated=e;state.running=true;state.startMono=nowMono()+900;$('mainBtn').textContent='STOP';$('mainBtn').classList.add('running');post('START',{startAt,elapsedMs:Math.round(state.accumulated)});
+  }
+  broadcastSync();
+}
+function resetTimer(){
+  state.running=false;state.accumulated=0;$('mainBtn').textContent='START';$('mainBtn').classList.remove('running');
+  if(state.connected)post('RESET',{});setStatus(state.connected?'Timer reset on both phones.':'Bluetooth not connected');
+}
+function broadcastSync(){post('SYNC',{running:state.running,elapsedMs:Math.round(currentElapsed()),serverNow:nowWall()})}
+setInterval(()=>{if(state.role==='controller'&&state.connected)broadcastSync()},500);
+setInterval(()=>{if(state.role==='display'&&state.connected)post('TIME_REQ',{t1:nowWall()})},3000);
+
+function beginTimeSync(msg,receivedAt){
+  const t1=msg.t1,t2=msg.t2,t3=msg.t3,t4=receivedAt;
+  const offset=((t2-t1)+(t3-t4))/2; const rtt=(t4-t1)-(t3-t2);
+  state.syncSamples.push({offset,rtt});if(state.syncSamples.length>7)state.syncSamples.shift();
+  const best=[...state.syncSamples].sort((a,b)=>a.rtt-b.rtt).slice(0,3);if(best.length)state.clockOffset=best.reduce((a,b)=>a+b.offset,0)/best.length;
+}
+
+window.__nativeEvent=(raw)=>{
+  try{
+    const packet=JSON.parse(raw);const data=packet.data||{};
+    if(packet.event==='host_started'){state.hostStarted=true;setStatus('Host ready — pair the phones, then wait for the Display to connect.');$('controllerConn').textContent='Waiting';return}
+    if(packet.event==='connected'){
+      state.connected=true;$('led').classList.add('on');updateConnection(true);setStatus(state.role==='controller'?'Display connected. Ready.':'Connected to Controller. Syncing clock…');
+      if(state.role==='display')post('TIME_REQ',{t1:nowWall()});return
+    }
+    if(packet.event==='disconnected'){state.connected=false;$('led').classList.remove('on');updateConnection(false);return}
+    if(packet.event==='error'){setStatus(data.message||'Bluetooth error');$('led').classList.remove('on');return}
+    if(packet.event==='bt_message'){
+      const msg=data.message||{};handleMessage(msg,data.receivedAt||nowWall())
+    }
+  }catch(e){setStatus('Native event error')}
+};
+function updateConnection(on){
+  if(state.role==='controller')$('controllerConn').textContent=on?'Connected':'Waiting';
+}
+function handleMessage(msg,receivedAt){
+  const type=msg.type;
+  if(type==='TIME_RES'&&state.role==='display'){beginTimeSync(msg,receivedAt);setStatus('Connected • clock synchronized');return}
+  if(state.role!=='display')return;
+  if(type==='START'){
+    state.running=true;state.displayAccumulated=Number(msg.elapsedMs||0);state.displayStartWall=Number(msg.startAt||nowWall());setStatus('RUNNING');return
+  }
+  if(type==='STOP'){
+    state.running=false;state.displayAccumulated=Number(msg.elapsedMs||0);setStatus('STOPPED');return
+  }
+  if(type==='RESET'){
+    state.running=false;state.displayAccumulated=0;setStatus('RESET');return
+  }
+  if(type==='SYNC'){
+    const remote=Number(msg.elapsedMs||0), controllerNow=Number(msg.serverNow||nowWall());
+    const local=displayElapsed();
+    if(msg.running){
+      if(Math.abs(remote-local)>80){
+        state.running=true;
+        state.displayAccumulated=remote;
+        state.displayStartWall=controllerNow;
+      }
+    }else{
+      state.running=false;
+      state.displayAccumulated=remote;
+    }
+    return
+  }
+}
+
+function toggleLanguage(){
+  state.lang=state.lang==='en'?'ar':'en';
+  document.documentElement.dir=state.lang==='ar'?'rtl':'ltr';
+  if(state.lang==='ar'){
+    $('hostLabel').textContent='مضيف البلوتوث';$('discoverLabel').textContent='الإقران';$('hostBtn').textContent='بدء المضيف';
+    document.querySelector('#controllerPanel .panel-title').textContent='التحكم';document.querySelector('#displayPanel .panel-title').textContent='الشاشة';
+    $('controllerBtn').textContent='تحكم';$('displayBtn').textContent='شاشة';
+  }else{
+    $('hostLabel').textContent='Bluetooth host';$('discoverLabel').textContent='Pairing';$('hostBtn').textContent='START HOST';
+    document.querySelector('#controllerPanel .panel-title').textContent='Controller';document.querySelector('#displayPanel .panel-title').textContent='Display';
+  }
+}
+</script>
+</body>
+</html>
